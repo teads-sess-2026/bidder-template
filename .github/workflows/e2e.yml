@@ -1,8 +1,9 @@
 name: e2e
 
-# Runs on every commit to this bidder. Builds & runs the bidder against
+# Distributed to every team bidder repo by infra/scripts/setup-team-ci.sh.
+# Runs on every commit to the bidder. Builds & runs the bidder against
 # Postgres + Redis, then pulls the e2e suite from the private infra repo and
-# runs it over HTTP. The TEST CONTENT is not in this repo — it lives in
+# runs it over HTTP. The TEST CONTENT is not in the bidder repo — it lives in
 # teads-sess-2026/infra (private) and is checked out at runtime using the
 # E2E_SUITE_TOKEN secret, so students never see the tests.
 on:
@@ -41,7 +42,6 @@ jobs:
       BIDDER_URL: http://localhost:8080
       DATABASE_URL: postgresql://bidder:bidder@localhost:5432/summerschool
       REDIS_URL: redis://localhost:6379
-      # Mapped so we can guard on it in `if:` (secrets aren't usable there directly).
       E2E_SUITE_TOKEN: ${{ secrets.E2E_SUITE_TOKEN }}
     steps:
       - uses: actions/checkout@v4 # this bidder
@@ -65,8 +65,6 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: '6379'
         run: |
-          # Kafka consumer disabled so startup doesn't wait on a broker we don't
-          # run in CI; the HTTP bid path doesn't need it.
           java -jar target/summerschool-0.0.1-SNAPSHOT.jar \
             --spring.kafka.listener.auto-startup=false \
             > bidder.log 2>&1 &
