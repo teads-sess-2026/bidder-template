@@ -21,6 +21,11 @@ public class Creative {
     // bidder.creative-budget; remaining budget is tracked live in Redis.
     private double budget;
 
+    // Highest price this creative is willing to pay. Requests whose floor price
+    // exceeds this are filtered out before bidding, regardless of targeting match.
+    // Null means unbounded (no cap) — matches allowedGeos/etc. defaulting to "no restriction".
+    private Double maxBidPrice;
+
     // Comma-separated values; empty string means no restriction
     @Column(length = 512)
     private String allowedGeos = "";
@@ -52,6 +57,9 @@ public class Creative {
     public double getBudget() { return budget; }
     public void setBudget(double budget) { this.budget = budget; }
 
+    public Double getMaxBidPrice() { return maxBidPrice; }
+    public void setMaxBidPrice(Double maxBidPrice) { this.maxBidPrice = maxBidPrice; }
+
     public String getAllowedGeos() { return allowedGeos; }
     public void setAllowedGeos(String allowedGeos) { this.allowedGeos = allowedGeos; }
 
@@ -60,6 +68,10 @@ public class Creative {
 
     public String getAudienceSegments() { return audienceSegments; }
     public void setAudienceSegments(String audienceSegments) { this.audienceSegments = audienceSegments; }
+
+    public boolean isWithinMaxBid(double floorPrice) {
+        return maxBidPrice == null || maxBidPrice >= floorPrice;
+    }
 
     public boolean matches(String geo, String deviceType, String audienceSegment) {
         return matchesField(allowedGeos, geo)

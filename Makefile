@@ -9,7 +9,7 @@ REDIS_HOST   ?= $(DB_HOST)
 CREATIVE_BUDGET ?= 25.0
 SCHEMA       := bidder_$(shell echo $(BIDDER_ID) | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g')
 
-.PHONY: help install build run run-team run-docker restart-bidder down test clean
+.PHONY: help install build run run-team run-docker restart-bidder down test clean run-prod run-team-prod down-prod logs-prod
 
 help:
 	@echo ""
@@ -29,6 +29,12 @@ help:
 	@echo "    make down              Stop the bidder container"
 	@echo "    make test              Run unit tests"
 	@echo "    make clean             Remove build artifacts"
+	@echo ""
+	@echo "  Bidder (prod mode — connects to the AWS backing services, see ../infra/terraform)"
+	@echo "    make run-prod          Build & run the bidder container using config.prod.env"
+	@echo "    make run-team-prod     Custom port/id in prod mode:  make run-team-prod PORT=8081 BIDDER_ID=team-alpha"
+	@echo "    make down-prod         Stop the prod-mode bidder container"
+	@echo "    make logs-prod         Tail the prod-mode bidder container logs"
 	@echo ""
 
 # ── Install / Build ──────────────────────────────────────────────────────────
@@ -74,6 +80,28 @@ restart-bidder:
 	  "UPDATE $(SCHEMA).creatives SET budget = $(CREATIVE_BUDGET) WHERE bidder_id = '$(BIDDER_ID)';"
 	docker compose restart bidder
 	@echo "✓ Bidder restarted — budget reset to $(CREATIVE_BUDGET) in Postgres and Redis"
+
+# ── Prod mode (connects to AWS backing services instead of local containers) ──
+
+run-prod:
+	@test -f config.prod.env || (echo "Missing config.prod.env — copy config.prod.env.example and fill in VM_HOST/DB_PASSWORD" && exit 1)
+	docker compose -f docker-compose.prod.yml up -d --build
+	@echo "✓ Bidder running in prod mode on port $${PORT:-8080}"
+	@docker compose -f docker-compose.prod.yml logs -f
+
+# PORT/BIDDER_ID are exported by the `export` directive above, so docker compose
+# picks them up automatically — same override pattern as run-team, against AWS.
+run-team-prod:
+	@test -f config.prod.env || (echo "Missing config.prod.env — copy config.prod.env.example and fill in VM_HOST/DB_PASSWORD" && exit 1)
+	docker compose -f docker-compose.prod.yml up -d --build
+	@echo "✓ Bidder running in prod mode on port $(PORT) (schema $(SCHEMA))"
+	@docker compose -f docker-compose.prod.yml logs -f
+
+down-prod:
+	docker compose -f docker-compose.prod.yml down
+
+logs-prod:
+	docker compose -f docker-compose.prod.yml logs -f
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 

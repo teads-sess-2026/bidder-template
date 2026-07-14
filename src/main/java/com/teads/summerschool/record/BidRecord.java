@@ -26,7 +26,7 @@ public class BidRecord {
     // Our own processing time for this request, in milliseconds
     private Integer latencyMs;
 
-    // Why we did not bid: budget_exhausted | no_eligible_creative | targeting_miss
+    // Why we did not bid: budget_exhausted | no_eligible_creative | targeting_miss | floor_exceeds_max_bid
     // Null when we submitted a bid.
     private String noBidReason;
 
