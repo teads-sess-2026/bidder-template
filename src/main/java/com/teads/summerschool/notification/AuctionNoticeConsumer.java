@@ -15,18 +15,18 @@ public class AuctionNoticeConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(AuctionNoticeConsumer.class);
 
-    private final WinNoticeBuffer winNoticeBuffer;
+    private final WinNoticeRepository winNoticeRepository;
     private final BidderProperties properties;
     private final BidderStatsCache statsCache;
     private final BidderMetrics metrics;
     private final OwnBidCache ownBidCache;
 
-    public AuctionNoticeConsumer(WinNoticeBuffer winNoticeBuffer,
+    public AuctionNoticeConsumer(WinNoticeRepository winNoticeRepository,
                                  BidderProperties properties,
                                  BidderStatsCache statsCache,
                                  BidderMetrics metrics,
                                  OwnBidCache ownBidCache) {
-        this.winNoticeBuffer = winNoticeBuffer;
+        this.winNoticeRepository = winNoticeRepository;
         this.properties = properties;
         this.statsCache = statsCache;
         this.metrics = metrics;
@@ -58,7 +58,7 @@ public class AuctionNoticeConsumer {
                 //   - ourBid.creativeId() / ourBid.bidPrice() is what we bid on this auction
                 //   - Call statsCache.recordWin(ourBid.creativeId(), notice.getClearingPrice())
                 //   - Call metrics.recordWin(notice.getClearingPrice())
-                //   - Save a WinNotice via winNoticeBuffer.enqueue(...)
+                //   - Save a WinNotice via winNoticeRepository.save(...)
                 log.info("** WIN  id={} creative={} clearing={} — not yet handled",
                         notice.getRequestId(), ourBid.creativeId(), notice.getClearingPrice());
             } else {

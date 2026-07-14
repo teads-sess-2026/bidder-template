@@ -2,6 +2,8 @@ package com.teads.summerschool.creative;
 
 import com.teads.summerschool.config.BidderProperties;
 import com.teads.summerschool.record.BidderStatsCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
@@ -10,6 +12,8 @@ import java.util.List;
 
 @Component
 public class CreativeSeeder implements ApplicationRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(CreativeSeeder.class);
 
     private final CreativeRepository repository;
     private final BidderProperties properties;
@@ -42,8 +46,17 @@ public class CreativeSeeder implements ApplicationRunner {
         }
 
         // Reset each creative's remaining budget in Redis to its configured limit on startup.
+        // A transient Redis timeout on one creative shouldn't crash the whole app: getRemainingBudget
+        // already falls back to the flat creative budget for a missing key, and recordWin's
+        // setIfAbsent lazily initializes it on first win, so skipping a failed creative here is
+        // safe, not silently wrong.
         for (Creative c : repository.findByBidderId(id)) {
-            statsCache.initBudget(c.getId(), c.getBudget());
+            try {
+                statsCache.initBudget(c.getId(), c.getBudget());
+            } catch (Exception e) {
+                log.warn("Failed to init budget for creative {} — will lazy-init on first read/win: {}",
+                        c.getId(), e.getMessage());
+            }
         }
 
         creativeCache.refresh();

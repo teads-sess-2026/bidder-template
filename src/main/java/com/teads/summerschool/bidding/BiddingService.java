@@ -8,7 +8,7 @@ import com.teads.summerschool.creative.Creative;
 import com.teads.summerschool.creative.CreativeCache;
 import com.teads.summerschool.metrics.BidderMetrics;
 import com.teads.summerschool.record.BidRecord;
-import com.teads.summerschool.record.BidRecordBuffer;
+import com.teads.summerschool.record.BidRecordRepository;
 import com.teads.summerschool.record.BidderStatsCache;
 import com.teads.summerschool.record.OwnBidCache;
 import jakarta.annotation.PostConstruct;
@@ -34,7 +34,7 @@ public class BiddingService {
 
     private final BidderProperties properties;
     private final CreativeCache creativeCache;
-    private final BidRecordBuffer bidRecordBuffer;
+    private final BidRecordRepository bidRecordRepository;
     private final BidderStatsCache statsCache;
     private final BidderMetrics metrics;
     private final OwnBidCache ownBidCache;
@@ -45,13 +45,13 @@ public class BiddingService {
 
     public BiddingService(BidderProperties properties,
                           CreativeCache creativeCache,
-                          BidRecordBuffer bidRecordBuffer,
+                          BidRecordRepository bidRecordRepository,
                           BidderStatsCache statsCache,
                           BidderMetrics metrics,
                           OwnBidCache ownBidCache) {
         this.properties = properties;
         this.creativeCache = creativeCache;
-        this.bidRecordBuffer = bidRecordBuffer;
+        this.bidRecordRepository = bidRecordRepository;
         this.statsCache = statsCache;
         this.metrics = metrics;
         this.ownBidCache = ownBidCache;
@@ -89,12 +89,12 @@ public class BiddingService {
         //   1. Record the request with buildRecord(request)
         //   2. Find matching creatives with matchingCreatives(request, creativeCache.getAll())
         //   3. Filter creatives whose maxBidPrice covers this floor: c.isWithinMaxBid(request.floorPrice())
-        //   4. Filter creatives that still have budget: statsCache.getRemainingBudgets(ids) (batched) > 0
+        //   4. Filter creatives that still have budget: statsCache.getRemainingBudget(c.getId()) > 0
         //   5. Compute a bid price with computeBidPrice(request)
         //   6. Record metrics: metrics.recordRequest(), metrics.recordBid(), metrics.recordNoBid(reason)
         //   7. Call ownBidCache.record(requestId, creativeId, bidPrice) so AuctionNoticeConsumer
         //      can look this bid up without a DB round trip
-        //   8. Enqueue the BidRecord with bidRecordBuffer.enqueue(record) and return
+        //   8. Save the BidRecord with bidRecordRepository.save(record) and return
         //      Optional.of(new BidResponse(...)) or Optional.empty()
         metrics.recordRequest();
         metrics.recordNoBid("not_implemented");
@@ -103,7 +103,7 @@ public class BiddingService {
         long start = System.nanoTime();
         record.setLatencyMs((int) ((System.nanoTime() - start) / 1_000_000));
         metrics.recordLatency(0);
-        bidRecordBuffer.enqueue(record);
+        bidRecordRepository.save(record);
         return Optional.empty();
     }
 

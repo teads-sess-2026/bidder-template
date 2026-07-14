@@ -36,7 +36,9 @@ public class BidController {
                     return (ResponseEntity<?>) ResponseEntity.noContent().build();
                 })
                 .exceptionally(ex -> {
-                    log.warn("<< BID TIMEOUT  id={} — {}", request.requestId(), ex.getMessage());
+                    Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                    log.warn("<< BID TIMEOUT  id={} — {}: {}", request.requestId(),
+                            cause.getClass().getSimpleName(), cause.getMessage(), cause);
                     return ResponseEntity.noContent().build();
                 });
     }
