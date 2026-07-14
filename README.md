@@ -12,82 +12,53 @@ Three areas are stubbed — look for `// TODO` comments:
 | `AuctionNoticeConsumer.java` | `consume()` — handle win and loss Kafka notices, track budget |
 | `StatsService.java` | `getStats()`, `getCreativeStats()`, `getTargetingStats()`, `getTimeseries()` — the dashboard API |
 
-See `STATS_API.md` for the full stats API contract.
-
 ---
 
 ## Workshop setup
 
-Two public URLs are needed:
-
-| What | Tool | Used for |
-|---|---|---|
-| Bidder HTTP endpoint | **ngrok** | SSP sends `/bid` requests to your machine |
-| Kafka notifications | **Tailscale** | Your bidder receives auction results from SSP's Kafka |
+Infrastructure (Postgres/Kafka/Redis/Prometheus/Grafana) runs on an always-on AWS VM
+(see `../infra/terraform`). SSP and every bidder run locally on the same local network,
+connecting out to that AWS-hosted infra — no public tunnels (ngrok/Tailscale) needed.
 
 ---
 
-### Step 1 — Join the Tailscale network
-
-All participants must join the same Tailscale network as the SSP machine.
+### Step 1 — Configure config.prod.env
 
 ```bash
-# Install (one-time)
-brew install tailscale
-sudo tailscale up
-# → opens browser for login — use the account shared by the workshop organiser
+cp config.prod.env.example config.prod.env
 ```
 
-Once connected, your machine can reach the SSP's Kafka directly.
-
----
-
-### Step 2 — Expose your bidder with ngrok
+Fill in `VM_HOST`/`DB_PASSWORD` (ask the organiser, or read them from Terraform outputs if
+you're the organiser):
 
 ```bash
-# Install (one-time)
-brew install ngrok
-ngrok config add-authtoken <your-token>   # sign up at ngrok.com
-
-# Start tunnel (keep this running)
-ngrok http 8080
-# → https://xxxx.ngrok-free.app
+cd ../infra/terraform
+VM_HOST=$(tofu output -raw vm_public_ip)
+DB_PASSWORD=$(tofu output -raw db_password)
 ```
 
-> The free plan gives a new random URL on every restart — update `config.env` each time.
+> Your machine must be in the Terraform `data_ingress_cidrs` allowlist to reach these ports.
 
 ---
 
-### Step 3 — Configure config.env
+### Step 2 — Register with the SSP
 
 Edit `config.env`:
 
 ```env
 BIDDER_ID=your-team-name
-BIDDER_ENDPOINT_URL=https://xxxx.ngrok-free.app     # your ngrok URL from Step 2
-KAFKA_BOOTSTRAP_SERVERS=100.104.247.47:9093          # SSP machine's Tailscale IP (given by organiser)
+BIDDER_ENDPOINT_URL=http://<your-local-ip>:8080     # SSP reaches you directly over the local network
 ```
 
----
-
-### Step 4 — Register with the SSP
-
-Tell the workshop organiser your:
-- `BIDDER_ID` (team name)
-- `BIDDER_ENDPOINT_URL` (ngrok URL)
-
-They will add you to `ssp/bidders.json` on the SSP machine.
+Tell the workshop organiser your `BIDDER_ID` and `BIDDER_ENDPOINT_URL`. They will add you to
+`ssp/bidders.json`.
 
 ---
 
-### Step 5 — Start infrastructure and bidder
-
-Infrastructure (Postgres/Kafka/Redis/Prometheus/Grafana) lives in the `ssp` repo now — the
-organiser starts it there with `make run`. This repo's bidder container joins that stack's
-`ss2026-net` Docker network, so it must already be running before you do this:
+### Step 3 — Run
 
 ```bash
-make run
+make run-prod
 ```
 
 ---
@@ -95,15 +66,17 @@ make run
 ## All commands
 
 ```bash
-make run                                       Start the bidder container (requires ssp's `make run` already running)
-make run-team PORT=9001 BIDDER_ID=team-alpha   Start with custom port/id
-make run-docker                                Alias for 'make run'
-make restart-bidder                            Reset this bidder's budget and restart the container
-make down                                      Stop the bidder container
-make build                                     Compile and package (skip tests)
-make test                                      Run unit tests
-make clean                                     Remove build artifacts
+make run-prod                                       Start the bidder container against the AWS-hosted infra (config.prod.env)
+make run-team-prod PORT=9001 BIDDER_ID=team-alpha   Same, with a custom port/id
+make down-prod                                       Stop the prod-mode bidder container
+make logs-prod                                       Tail the prod-mode bidder container logs
+make build                                           Compile and package (skip tests)
+make test                                            Run unit tests
+make clean                                           Remove build artifacts
 ```
+
+> Local-only mode (`make run`, joining a local `ss2026-net` Docker network instead of the
+> AWS-hosted infra) is also available — see `make help`.
 
 ---
 
@@ -124,11 +97,10 @@ make clean                                     Remove build artifacts
 
 ## Configuration reference
 
-| Variable | Description |
-|---|---|
-| `BIDDER_ID` | Your team's unique ID — must match `id` in `ssp/bidders.json` |
-| `BIDDER_ENDPOINT_URL` | Your ngrok public URL |
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` if co-located with Docker, `<tailscale-ip>:9093` if remote |
-| `TAILSCALE_IP` | This machine's Tailscale IP (only needed if running Docker here) |
+| Variable | File | Description |
+|---|---|---|
+| `BIDDER_ID` | `config.env` | Your team's unique ID — must match `id` in `ssp/bidders.json` |
+| `BIDDER_ENDPOINT_URL` | `config.env` | Your machine's local HTTP address — SSP and every bidder run on the same local network |
+| `VM_HOST`, `DB_PASSWORD`, etc. | `config.prod.env` | AWS-hosted Postgres/Kafka/Redis connection details — see `config.prod.env.example` for the full list |
 
 Bidder strategy, budget, and competition timing are in `src/main/resources/application.properties`.
