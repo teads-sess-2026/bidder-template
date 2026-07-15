@@ -129,7 +129,11 @@ jobs:
           cache: maven
 
       - name: Build bidder
-        run: ./mvnw -q -B -DskipTests package
+        # chmod: team repos created by copying template files can lose the
+        # executable bit on mvnw, so don't rely on it being set.
+        run: |
+          chmod +x mvnw
+          ./mvnw -q -B -DskipTests package
 
       - name: Start bidder
         env:
